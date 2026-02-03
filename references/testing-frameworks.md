@@ -1,6 +1,6 @@
 # Testing Frameworks - Detailed Guide
 
-> **Part of:** [terraform-skill](../SKILL.md)
+> **Part of:** [rs-terraform-skill](../SKILL.md)
 > **Purpose:** Detailed guides for Terraform/OpenTofu testing frameworks
 
 This document provides in-depth guidance on testing frameworks for Infrastructure as Code. For the decision matrix and high-level overview, see the [main skill file](../SKILL.md#testing-strategy-framework).
@@ -9,10 +9,117 @@ This document provides in-depth guidance on testing frameworks for Infrastructur
 
 ## Table of Contents
 
-1. [Static Analysis](#static-analysis)
-2. [Plan Testing](#plan-testing)
-3. [Native Terraform Tests](#native-terraform-tests)
-4. [Terratest (Go-based)](#terratest-go-based)
+1. [rs_infra Testing Strategy](#rs_infra-testing-strategy)
+2. [Static Analysis](#static-analysis)
+3. [Plan Testing](#plan-testing)
+4. [Native Terraform Tests](#native-terraform-tests)
+5. [Terratest (Go-based)](#terratest-go-based)
+
+---
+
+## rs_infra Testing Strategy
+
+The rs_infra codebase uses a layered testing approach per ADR-009:
+
+### Test Hierarchy
+
+| Layer | Tool | Location | When to Use |
+|-------|------|----------|-------------|
+| **Unit Tests** | OpenTofu native tests | `modules/*/tests/*.tftest.hcl` | Variable validation, resource planning |
+| **Integration Tests** | Terratest | `tests/integration/*_test.go` | Real GCP resource creation |
+| **Security Scanning** | Checkov | `.checkov.yaml` | Every commit (pre-commit hook) |
+| **Linting** | TFLint | `.tflint.hcl` | Every commit (pre-commit hook) |
+
+### OpenTofu Native Test Pattern (rs_infra)
+
+Follow the pattern from `modules/vpc-host/tests/valid_inputs.tftest.hcl`:
+
+```hcl
+# Unit tests for <module> input validation
+# These tests validate module configuration without deploying resources
+
+mock_provider "google" {}
+mock_provider "google-beta" {}
+
+# Test: Valid configuration passes planning
+run "valid_<scenario>" {
+  command = plan
+
+  variables {
+    org_id          = "123456789012"
+    billing_account = "AABBCC-DDEEFF-112233"
+    folder_id       = "987654321098"
+    project_name    = "test-project"
+    project_id      = "test-project-abc123"
+    # Module-specific variables
+  }
+
+  assert {
+    condition     = <validation_condition>
+    error_message = "Descriptive error message"
+  }
+}
+```
+
+### Terratest Pattern (rs_infra)
+
+Integration tests use helpers from `tests/helpers/`:
+
+```go
+package integration
+
+import (
+    "testing"
+    "github.com/gruntwork-io/terratest/modules/terraform"
+    "github.com/stretchr/testify/assert"
+
+    // Project-specific helpers
+    "rs-infra/tests/helpers"
+)
+
+func TestModule_Scenario(t *testing.T) {
+    t.Parallel()
+
+    // Use project helper for test project
+    projectID := helpers.GetTestProjectID(t)
+
+    terraformOptions := terraform.WithDefaultRetryableErrors(t, &terraform.Options{
+        TerraformDir: "../../modules/<module>",
+        Vars: map[string]interface{}{
+            "project_id": projectID,
+        },
+    })
+
+    defer terraform.Destroy(t, terraformOptions)
+    terraform.InitAndApply(t, terraformOptions)
+
+    // Assertions
+}
+```
+
+### Test Execution Commands
+
+```bash
+# Run unit tests for specific module
+cd modules/<module>
+tofu init -backend=false
+tofu test
+
+# Run all unit tests
+for module in modules/*/; do
+  if [ -d "${module}tests" ]; then
+    tofu -chdir="$module" init -backend=false
+    tofu -chdir="$module" test
+  fi
+done
+
+# Run integration tests (requires TEST_PROJECT_ID)
+export TEST_PROJECT_ID=your-test-project
+cd tests && go test -v -timeout 30m ./integration/...
+
+# Run specific integration test
+go test -v -run "TestVPC.*" ./integration/...
+```
 
 ---
 

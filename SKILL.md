@@ -1,10 +1,10 @@
 ---
-name: terraform-skill
-description: Use when working with Terraform or OpenTofu - creating modules, writing tests (native test framework, Terratest), setting up CI/CD pipelines, reviewing configurations, choosing between testing approaches, debugging state issues, implementing security scanning (trivy, checkov), or making infrastructure-as-code architecture decisions
+name: rs-terraform-skill
+description: Use when working with Terraform or OpenTofu in rs_infra - creating modules, writing tests (OpenTofu native tests, Terratest), setting up CI/CD pipelines, reviewing configurations, implementing security scanning (checkov), GCP patterns (CMEK, IAM groups, Shared VPC), or making infrastructure-as-code architecture decisions
 license: Apache-2.0
 metadata:
-  author: Anton Babenko
-  version: 1.6.0
+  author: RelevantSearch (derived from Anton Babenko's terraform-skill)
+  version: 2.0.0
 ---
 
 # Terraform Skill for Claude
@@ -368,6 +368,80 @@ my-module/
 **For complete CI/CD templates, see:**
 - **[CI/CD Workflows Guide](references/ci-cd-workflows.md)** - GitHub Actions, GitLab CI, Atlantis integration, cost optimization
 - **[Quick Reference](references/quick-reference.md#troubleshooting-guide)** - Common CI/CD issues and solutions
+
+## Agentic Development Workflow
+
+When using Claude for infrastructure development, follow this 5-phase workflow:
+
+### Phase 1: Planning
+
+Before implementation:
+1. Check existing ADRs in `docs/adr/` for relevant decisions
+2. Review `ARCHITECTURE.md` for system context
+3. Assess blast radius (environments and resources affected)
+4. Create or update ADR if making architectural decisions
+
+### Phase 2: TDD (Test-Driven Development)
+
+**Always write tests first:**
+
+1. **Generate test scaffolding** before implementation:
+   ```bash
+   # Unit tests (OpenTofu native)
+   modules/<module>/tests/<test_name>.tftest.hcl
+
+   # Integration tests (Terratest)
+   tests/integration/<module>_test.go
+   ```
+
+2. **Run tests - verify they fail (RED)**:
+   ```bash
+   cd modules/<module>
+   tofu init -backend=false
+   tofu test
+   ```
+
+3. **Implement minimum code (GREEN)**
+4. **Refactor** while keeping tests passing
+
+### Phase 3: Implementation
+
+Follow rs_infra patterns:
+- Use `snake_case` for all resources, variables, outputs
+- Include `description` for all variables and outputs
+- Follow standard module layout (main.tf, variables.tf, outputs.tf, versions.tf)
+- Use Terragrunt for environment-specific configuration
+
+### Phase 4: Atomic Commits
+
+Create focused commits following conventional format:
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+Refs: ADR-XXX (if applicable)
+```
+
+**Types:** feat, fix, docs, refactor, test, chore
+**Scopes:** Module name, environment, or component
+
+### Phase 5: Documentation Sync
+
+After implementation:
+1. Update module README: `terraform-docs markdown table --output-file README.md modules/<module>`
+2. Update `ARCHITECTURE.md` if resources changed
+3. Update or create ADRs for architectural decisions
+4. Ensure runbooks reflect operational changes
+
+### Workflow Commands
+
+Use these commands in Claude:
+- `/tdd <module> <description>` - Start TDD workflow
+- `/commit` - Create atomic commit
+- `/plan <description>` - Start planning workflow
+- `/review [--security]` - Review code changes
+- `/doc-sync [--check-only]` - Sync documentation
 
 ## Security & Compliance
 

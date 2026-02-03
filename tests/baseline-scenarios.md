@@ -363,6 +363,175 @@ variable "enable_encryption" {
 
 ---
 
+## Scenario 9: TDD Workflow Adherence
+
+**Objective:** Verify agent writes tests BEFORE implementation
+
+### Test Prompt
+```
+Create a new Terraform module for Cloud SQL with:
+- Private IP connectivity
+- Automated backups
+- Point-in-time recovery
+```
+
+### Expected Baseline Behavior (WITHOUT skill)
+- Agent creates module structure (main.tf, variables.tf, outputs.tf)
+- Implements Cloud SQL resources directly
+- **Likely SKIPS:** Test files entirely
+- **Rationalization:** "I'll implement first, tests can be added later"
+
+### Target Behavior (WITH skill)
+- Agent asks about testing approach
+- Creates `.tftest.hcl` file FIRST
+- Runs tests to confirm RED phase
+- Then implements to make tests pass (GREEN)
+- References ADR-009 (Test Coverage Strategy)
+
+### Success Criteria
+- [ ] Agent creates test file before implementation
+- [ ] Agent runs tests to confirm failure (RED phase)
+- [ ] Agent implements minimum code to pass (GREEN phase)
+- [ ] Agent follows TDD workflow from skill
+- [ ] Agent references rs_infra test patterns
+
+---
+
+## Scenario 10: Terragrunt State Isolation
+
+**Objective:** Verify agent uses correct Terragrunt environment structure
+
+### Test Prompt
+```
+Add a new workload configuration for environment: production
+The workload should use the existing VPC and create a GKE cluster.
+```
+
+### Expected Baseline Behavior (WITHOUT skill)
+- May create flat structure
+- May not use `_env/` include pattern
+- **Likely SKIPS:** Proper state isolation
+- **Rationalization:** "Just add it to the main config"
+
+### Target Behavior (WITH skill)
+- Creates proper environment structure:
+  ```
+  environments/production/<workload>/
+  ├── terragrunt.hcl
+  └── uses _env/production.hcl
+  ```
+- Uses `include "env"` pattern
+- References module from `modules/` directory
+- Maintains state isolation per ADR-007
+
+### Success Criteria
+- [ ] Correct directory structure created
+- [ ] Uses `_env/` include pattern
+- [ ] References module correctly
+- [ ] State path will be isolated
+- [ ] Follows ADR-007 patterns
+
+---
+
+## Scenario 11: GCP Security Patterns
+
+**Objective:** Verify agent includes CMEK, IAM groups in GCP resources
+
+### Test Prompt
+```
+Create a Cloud Storage bucket for storing application logs.
+```
+
+### Expected Baseline Behavior (WITHOUT skill)
+- Creates basic bucket
+- **Likely SKIPS:** CMEK encryption, lifecycle rules
+- **May use:** Default encryption
+- **Rationalization:** "Google encrypts by default"
+
+### Target Behavior (WITH skill)
+- Includes CMEK encryption per ADR-003:
+  ```hcl
+  encryption {
+    default_kms_key_name = var.kms_key_id
+  }
+  ```
+- Uses group-based IAM per ADR-004
+- Adds lifecycle rules for log retention
+- References rs_infra security patterns
+
+### Success Criteria
+- [ ] CMEK encryption included
+- [ ] References KMS key (not default encryption)
+- [ ] IAM uses groups (if applicable)
+- [ ] Follows ADR-003 and ADR-004 patterns
+- [ ] Checkov-compliant configuration
+
+---
+
+## Scenario 12: Atomic Commit Guidance
+
+**Objective:** Verify agent suggests proper commit format
+
+### Test Prompt
+```
+I've made changes to the vpc-host module and added some logging configuration.
+Help me commit these changes.
+```
+
+### Expected Baseline Behavior (WITHOUT skill)
+- Generic commit message
+- **Likely suggests:** Single commit for all changes
+- **Rationalization:** "Just commit everything together"
+
+### Target Behavior (WITH skill)
+- Suggests splitting into separate commits:
+  1. `feat(vpc-host): <vpc changes>`
+  2. `feat(logging): <logging changes>`
+- Uses conventional commit format
+- Includes scope (module name)
+- Suggests running pre-commit hooks first
+
+### Success Criteria
+- [ ] Suggests splitting unrelated changes
+- [ ] Uses conventional commit format
+- [ ] Correct type (feat, fix, etc.)
+- [ ] Includes scope (module name)
+- [ ] Mentions pre-commit validation
+
+---
+
+## Scenario 13: Documentation Sync
+
+**Objective:** Verify agent reminds about documentation updates
+
+### Test Prompt
+```
+I've added a new output to the kms module. What else do I need to do?
+```
+
+### Expected Baseline Behavior (WITHOUT skill)
+- May mention testing
+- **Likely SKIPS:** terraform-docs, README update
+- **Rationalization:** "Just the code change is needed"
+
+### Target Behavior (WITH skill)
+- Reminds to update README:
+  ```bash
+  terraform-docs markdown table --output-file README.md modules/kms
+  ```
+- Checks if ARCHITECTURE.md needs update
+- Verifies if change aligns with ADRs
+- Suggests running doc-sync workflow
+
+### Success Criteria
+- [ ] Mentions terraform-docs for README
+- [ ] Considers ARCHITECTURE.md
+- [ ] References ADR alignment
+- [ ] Suggests documentation sync workflow
+- [ ] Provides specific command to run
+
+---
+
 ## Running These Tests
 
 ### Step 1: Prepare Test Environment

@@ -1,6 +1,6 @@
 # CI/CD Workflows for Terraform
 
-> **Part of:** [terraform-skill](../SKILL.md)
+> **Part of:** [rs-terraform-skill](../SKILL.md)
 > **Purpose:** CI/CD integration patterns for Terraform/OpenTofu
 
 This document provides detailed CI/CD workflow templates and optimization strategies for infrastructure-as-code pipelines.
@@ -9,11 +9,195 @@ This document provides detailed CI/CD workflow templates and optimization strate
 
 ## Table of Contents
 
-1. [GitHub Actions Workflow](#github-actions-workflow)
-2. [GitLab CI Template](#gitlab-ci-template)
-3. [Cost Optimization](#cost-optimization)
-4. [Automated Cleanup](#automated-cleanup)
-5. [Best Practices](#best-practices)
+1. [rs_infra CI/CD Workflows](#rs_infra-cicd-workflows)
+2. [Workload Identity Federation](#workload-identity-federation)
+3. [GitHub Actions Workflow](#github-actions-workflow)
+4. [GitLab CI Template](#gitlab-ci-template)
+5. [Cost Optimization](#cost-optimization)
+6. [Automated Cleanup](#automated-cleanup)
+7. [Best Practices](#best-practices)
+
+---
+
+## rs_infra CI/CD Workflows
+
+The rs_infra codebase uses GitHub Actions with these workflows:
+
+| Workflow | Trigger | Purpose |
+|----------|---------|---------|
+| `terragrunt-plan` | PR | Lint, plan, security scan |
+| `terragrunt-apply` | Push to main | Apply changes |
+| `terraform-docs` | Module changes | Update READMEs |
+| `drift-detection` | Daily 6 AM | Detect configuration drift |
+
+### terragrunt-plan.yml
+
+```yaml
+name: Terragrunt Plan
+
+on:
+  pull_request:
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+
+permissions:
+  contents: read
+  id-token: write  # Required for WIF
+  pull-requests: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup OpenTofu
+        uses: opentofu/setup-opentofu@v1
+        with:
+          tofu_version: 1.8.8
+
+      - name: Setup Terragrunt
+        run: |
+          curl -L -o terragrunt https://github.com/gruntwork-io/terragrunt/releases/download/v0.72.6/terragrunt_linux_amd64
+          chmod +x terragrunt && sudo mv terragrunt /usr/local/bin/
+
+      - name: Format Check
+        run: tofu fmt -recursive -check
+
+      - name: Lint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - run: tflint --recursive
+
+      - name: Security Scan
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          config_file: .checkov.yaml
+
+      - name: Terragrunt Plan
+        run: |
+          cd environments
+          terragrunt run-all plan --terragrunt-non-interactive
+
+      - name: Post Plan to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Post plan summary to PR
+```
+
+### terragrunt-apply.yml
+
+```yaml
+name: Terragrunt Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environments/**'
+      - 'modules/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    environment: production  # Requires approval
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup Tools
+        # ... same as plan
+
+      - name: Terragrunt Apply
+        run: |
+          cd environments
+          terragrunt run-all apply --terragrunt-non-interactive
+```
+
+---
+
+## Workload Identity Federation
+
+Per ADR-008, use WIF instead of service account keys:
+
+### Setup
+
+1. **Create Workload Identity Pool**:
+```hcl
+resource "google_iam_workload_identity_pool" "github" {
+  project                   = var.project_id
+  workload_identity_pool_id = "github-pool"
+  display_name              = "GitHub Actions Pool"
+}
+```
+
+2. **Create Provider**:
+```hcl
+resource "google_iam_workload_identity_pool_provider" "github" {
+  project                            = var.project_id
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+
+  attribute_condition = "assertion.repository == 'RelevantSearch/rs_infra'"
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+```
+
+3. **Grant Access**:
+```hcl
+resource "google_service_account_iam_binding" "workload_identity" {
+  service_account_id = google_service_account.ci.name
+  role               = "roles/iam.workloadIdentityUser"
+
+  members = [
+    "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/RelevantSearch/rs_infra"
+  ]
+}
+```
+
+### GitHub Actions Usage
+
+```yaml
+- name: Authenticate to GCP
+  uses: google-github-actions/auth@v2
+  with:
+    workload_identity_provider: projects/123456/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+    service_account: ci-runner@rs-infra-484217.iam.gserviceaccount.com
+```
+
+**Benefits:**
+- No long-lived credentials
+- Automatic token rotation
+- Repository-scoped access
+- Audit trail in GCP
 
 ---
 

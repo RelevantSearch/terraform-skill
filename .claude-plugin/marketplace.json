@@ -1,29 +1,34 @@
 {
-  "name": "antonbabenko",
+  "name": "relevantsearch",
   "owner": {
-    "name": "Anton Babenko"
+    "name": "RelevantSearch"
   },
-  "version": "1.6.0",
+  "version": "2.0.0",
   "metadata": {
-    "description": "Comprehensive Terraform and OpenTofu best practices skill covering testing, modules, CI/CD, and production patterns.",
-    "repository": "https://github.com/antonbabenko/terraform-skill",
-    "license": "Apache-2.0"
+    "description": "Terraform and OpenTofu skill optimized for rs_infra patterns - GCP infrastructure, CMEK encryption, group-based IAM, Shared VPC, OpenTofu native testing, and Terragrunt workflows.",
+    "repository": "https://github.com/RelevantSearch/rs-terraform-skill",
+    "license": "Apache-2.0",
+    "derived_from": "https://github.com/antonbabenko/terraform-skill"
   },
   "plugins": [
     {
-      "name": "terraform-skill",
-      "description": "Use when working with Terraform or OpenTofu - creating modules, writing tests (native test framework, Terratest), setting up CI/CD pipelines, reviewing configurations, choosing between testing approaches, debugging state issues, implementing security scanning (trivy, checkov), or making infrastructure-as-code architecture decisions",
+      "name": "rs-terraform-skill",
+      "description": "Use when working with Terraform or OpenTofu in rs_infra - creating modules, writing tests (OpenTofu native tests, Terratest), setting up CI/CD pipelines, reviewing configurations, implementing security scanning (checkov), GCP patterns (CMEK, IAM groups, Shared VPC), or making infrastructure-as-code architecture decisions",
       "source": "./",
       "category": "development",
       "keywords": [
         "terraform",
         "opentofu",
         "infrastructure-as-code",
+        "gcp",
+        "terragrunt",
         "testing",
         "ci-cd",
-        "modules"
+        "modules",
+        "cmek",
+        "shared-vpc"
       ],
-      "version": "1.6.0"
+      "version": "2.0.0"
     }
   ]
 }
