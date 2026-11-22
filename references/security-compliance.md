@@ -1,6 +1,6 @@
 # Security & Compliance
 
-> **Part of:** [terraform-skill](../SKILL.md)
+> **Part of:** [rs-terraform-skill](../SKILL.md)
 > **Purpose:** Security best practices and compliance patterns for Terraform/OpenTofu
 
 This document provides security hardening guidance and compliance automation strategies for infrastructure-as-code.
@@ -9,11 +9,145 @@ This document provides security hardening guidance and compliance automation str
 
 ## Table of Contents
 
-1. [Security Scanning Tools](#security-scanning-tools)
-2. [Common Security Issues](#common-security-issues)
-3. [Compliance Testing](#compliance-testing)
-4. [Secrets Management](#secrets-management)
-5. [State File Security](#state-file-security)
+1. [rs_infra Security Patterns](#rs_infra-security-patterns)
+2. [Security Scanning Tools](#security-scanning-tools)
+3. [Common Security Issues](#common-security-issues)
+4. [Compliance Testing](#compliance-testing)
+5. [Secrets Management](#secrets-management)
+6. [State File Security](#state-file-security)
+
+---
+
+## rs_infra Security Patterns
+
+The rs_infra codebase implements several security patterns documented in ADRs:
+
+### CMEK Encryption (ADR-003)
+
+All data at rest must use Customer-Managed Encryption Keys:
+
+```hcl
+# Pattern: Cloud KMS key with autokey
+resource "google_kms_key_ring" "this" {
+  name     = "${var.project_name}-keyring"
+  location = var.region
+  project  = var.project_id
+}
+
+resource "google_kms_crypto_key" "this" {
+  name            = "${var.project_name}-key"
+  key_ring        = google_kms_key_ring.this.id
+  rotation_period = "7776000s"  # 90 days
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Usage in storage resources
+resource "google_storage_bucket" "this" {
+  name     = var.bucket_name
+  location = var.region
+
+  encryption {
+    default_kms_key_name = google_kms_crypto_key.this.id
+  }
+}
+```
+
+### Group-Based IAM (ADR-004)
+
+Use Google Groups for IAM instead of individual users:
+
+```hcl
+# Pattern: IAM binding to Google Group
+resource "google_project_iam_member" "this" {
+  project = var.project_id
+  role    = "roles/viewer"
+  member  = "group:${var.group_email}"  # e.g., "developers@relevantsearch.com"
+}
+
+# Anti-pattern: Individual user bindings
+# resource "google_project_iam_member" "bad" {
+#   member = "user:john@example.com"  # DON'T DO THIS
+# }
+```
+
+### Organization Policies (ADR-006)
+
+Enforce security policies at organization level:
+
+```hcl
+# Pattern: Disable default service account creation
+resource "google_org_policy_policy" "disable_service_account_creation" {
+  name   = "organizations/${var.org_id}/policies/iam.disableServiceAccountCreation"
+  parent = "organizations/${var.org_id}"
+
+  spec {
+    rules {
+      enforce = "TRUE"
+    }
+  }
+}
+
+# Pattern: Restrict VM external IP addresses
+resource "google_org_policy_policy" "vm_external_ip" {
+  name   = "organizations/${var.org_id}/policies/compute.vmExternalIpAccess"
+  parent = "organizations/${var.org_id}"
+
+  spec {
+    rules {
+      deny_all = "TRUE"
+    }
+  }
+}
+```
+
+### Checkov Skip Documentation
+
+When security checks must be skipped, document in `.checkov.yaml`:
+
+```yaml
+# .checkov.yaml
+skip-check:
+  # CKV_GCP_XX: Reason for skipping, reference ADR if applicable
+  - CKV_GCP_62  # Skip: GKE private cluster requires specific network setup per ADR-001
+```
+
+**Always include:**
+1. The check ID
+2. A clear reason
+3. Reference to ADR if architectural decision
+
+### Workload Identity Federation (ADR-008)
+
+For CI/CD pipelines, use WIF instead of service account keys:
+
+```hcl
+# Pattern: Workload Identity Pool for GitHub Actions
+resource "google_iam_workload_identity_pool" "github" {
+  project                   = var.project_id
+  workload_identity_pool_id = "github-pool"
+  display_name              = "GitHub Actions Pool"
+}
+
+resource "google_iam_workload_identity_pool_provider" "github" {
+  project                            = var.project_id
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_provider_id = "github-provider"
+  display_name                       = "GitHub Provider"
+
+  attribute_mapping = {
+    "google.subject"       = "assertion.sub"
+    "attribute.actor"      = "assertion.actor"
+    "attribute.repository" = "assertion.repository"
+  }
+
+  oidc {
+    issuer_uri = "https://token.actions.githubusercontent.com"
+  }
+}
+```
 
 ---
 

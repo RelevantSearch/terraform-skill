@@ -267,6 +267,151 @@ Look for agent:
 
 ---
 
+## Scenario 9: TDD Workflow Adherence
+
+### Expected Improvements
+
+**Baseline → Compliance Changes:**
+- Agent NOW writes tests before implementation
+- Agent follows RED-GREEN-REFACTOR cycle
+- Agent references ADR-009 testing strategy
+- Agent uses rs_infra test patterns
+
+### Success Criteria Verification
+
+- [ ] Agent creates test file first
+- [ ] Agent runs tests to confirm RED phase
+- [ ] Agent implements minimum code for GREEN
+- [ ] Agent follows TDD workflow
+- [ ] Agent references rs_infra patterns
+
+### Evidence Checklist
+
+Look for agent:
+- Creating `.tftest.hcl` BEFORE `main.tf`
+- Running `tofu test` to confirm failure
+- Mentioning "RED phase" or "tests should fail"
+- Using `mock_provider` pattern from skill
+- Referencing ADR-009
+
+---
+
+## Scenario 10: Terragrunt State Isolation
+
+### Expected Improvements
+
+**Baseline → Compliance Changes:**
+- Agent NOW uses proper environment structure
+- Agent includes `_env/` pattern
+- Agent maintains state isolation
+- Agent references ADR-007
+
+### Success Criteria Verification
+
+- [ ] Correct directory structure
+- [ ] Uses `_env/` include pattern
+- [ ] Module reference correct
+- [ ] State path isolated
+- [ ] Follows ADR-007
+
+### Evidence Checklist
+
+Look for agent:
+- Creating `environments/<env>/<workload>/terragrunt.hcl`
+- Using `include "env"` block
+- Referencing `${get_repo_root()}/modules//`
+- Mentioning state isolation
+- Referencing ADR-007
+
+---
+
+## Scenario 11: GCP Security Patterns
+
+### Expected Improvements
+
+**Baseline → Compliance Changes:**
+- Agent NOW includes CMEK encryption
+- Agent uses group-based IAM
+- Agent follows ADR-003 and ADR-004
+- Agent produces Checkov-compliant code
+
+### Success Criteria Verification
+
+- [ ] CMEK encryption included
+- [ ] KMS key referenced
+- [ ] Group-based IAM used
+- [ ] Follows ADR patterns
+- [ ] Checkov compliant
+
+### Evidence Checklist
+
+Look for agent:
+- Adding `encryption { default_kms_key_name = ... }` block
+- Using `member = "group:..."` for IAM
+- Mentioning ADR-003 (CMEK) or ADR-004 (IAM)
+- Not using `user:xxx@` bindings
+- Referencing security compliance guide
+
+---
+
+## Scenario 12: Atomic Commit Guidance
+
+### Expected Improvements
+
+**Baseline → Compliance Changes:**
+- Agent NOW suggests splitting unrelated changes
+- Agent uses conventional commit format
+- Agent includes proper scope
+- Agent mentions pre-commit validation
+
+### Success Criteria Verification
+
+- [ ] Suggests splitting changes
+- [ ] Conventional format used
+- [ ] Correct type identified
+- [ ] Scope (module name) included
+- [ ] Pre-commit mentioned
+
+### Evidence Checklist
+
+Look for agent:
+- Identifying multiple logical changes
+- Suggesting separate commits
+- Using format: `<type>(<scope>): <description>`
+- Recommending `pre-commit run`
+- Referencing atomic commit skill
+
+---
+
+## Scenario 13: Documentation Sync
+
+### Expected Improvements
+
+**Baseline → Compliance Changes:**
+- Agent NOW reminds about terraform-docs
+- Agent considers ARCHITECTURE.md
+- Agent checks ADR alignment
+- Agent suggests doc-sync workflow
+
+### Success Criteria Verification
+
+- [ ] Mentions terraform-docs
+- [ ] Considers ARCHITECTURE.md
+- [ ] References ADRs
+- [ ] Suggests doc-sync
+- [ ] Provides specific command
+
+### Evidence Checklist
+
+Look for agent:
+- Providing `terraform-docs markdown table` command
+- Asking if topology changed (ARCHITECTURE.md)
+- Checking ADR alignment
+- Mentioning `/doc-sync` command
+- Referencing doc sync skill
+
+---
+
 ## Overall Compliance Assessment
 
 ### Passing Criteria
@@ -274,9 +419,9 @@ Look for agent:
 Skill is considered "passing GREEN phase" when:
 
 **Quantitative:**
-- [ ] 8/8 scenarios show measurable behavior improvement
+- [ ] 13/13 scenarios show measurable behavior improvement
 - [ ] 80%+ of success criteria met across all scenarios
-- [ ] Agent references skill content in 7/8+ scenarios
+- [ ] Agent references skill content in 11/13+ scenarios
 
 **Qualitative:**
 - [ ] Agent proactively applies patterns (not reactive)
@@ -331,7 +476,7 @@ Create file: `compliance-results/SUMMARY.md`
 
 ## GREEN Phase Complete When:
 
-- [ ] All 8 scenarios run WITH skill loaded
+- [ ] All 13 scenarios run WITH skill loaded
 - [ ] Results documented in `compliance-results/` directory
 - [ ] Comparison to baseline complete for all scenarios
 - [ ] Success criteria evaluated
